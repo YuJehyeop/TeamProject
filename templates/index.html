@@ -236,7 +236,7 @@
                             </div>
                         </div>
 
-                        <div id="photo-place-test" style="display: block;">
+                        <div id="photo-place-test" style="display: none;">
                             <div>
                                 <h3>업로드 날짜<select class="form-control" id="exampleFormControlSelect1">
                                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option>
@@ -247,25 +247,13 @@
                                 <div class="images">
                                 </div>
                                 <div class="custom-file">
-                                    <input type="file" id="file" style="display:block;" name="file" accept=".jpg,.jpeg,.png,.gif,.bmp" multiple value>
+                                    <input type="file" id="file" style="display:none;" name="file" accept=".jpg,.jpeg,.png,.gif,.bmp" multiple value>
                                     <label class="input-file-button" for="file">이미지 가져오기</label>
                                     <button onclick="uploadphoto()" class="input-file-button" >사진 업로드</button>
                                 </div>
 
                                 <h3>등록된 사진</h3>
-                                <div class="images-list">
-                                    <span class="image-card">위치1</span>
-                                    <span class="image-card">위치2</span>
-                                    <span class="image-card">위치3</span>
-                                    <span class="image-card">위치1</span>
-                                    <span class="image-card">위치2</span>
-                                    <span class="image-card">위치3</span>
-                                    <span class="image-card">위치1</span>
-                                    <span class="image-card">위치2</span>
-                                    <span class="image-card">위치3</span>
-                                    <span class="image-card">위치1</span>
-                                    <span class="image-card">위치2</span>
-                                    <span class="image-card">위치3</span>
+                                <div class="images-list" id="post_photo">
                                 </div>
                             </div>
                         </div>
