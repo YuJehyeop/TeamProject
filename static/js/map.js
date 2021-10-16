@@ -73,7 +73,6 @@ function displayPlaces(places) {
     // 지도에 표시되고 있는 마커를 제거합니다
     removeMarker();
 
-
     let positions = []
     let addresses = []
     let lat = []
@@ -117,7 +116,7 @@ function displayPlaces(places) {
                 map.setCenter(positions[num]);
 
                 // 지도를 찍었을 때
-                clickPlaceMarker(title, lat[num], lng[num], addresses[num])
+                clickPlaceMarker(title, addresses[num], lat, lng)
             });
 
             itemEl.onmouseover = function () {
@@ -134,7 +133,7 @@ function displayPlaces(places) {
                 map.setCenter(positions[num]);
 
                 // 검색된 장소를 찍었을 때
-                clickPlaceMarker(title, lat[num], lng[num], addresses[num])
+                clickPlaceMarker(title, addresses[num],  lat, lng)
             };
             itemEl.onmouseout = function () {
                 infowindow.close();
@@ -157,7 +156,7 @@ function displayPlaces(places) {
 
 function getListItem(index, places) {
     let el = document.createElement('a'),
-        itemStr = '<a href="#" class="list-group-item list-group-item-action flex-column align-items-start"\n' +
+        itemStr = '<a class="list-group-item list-group-item-action flex-column align-items-start"\n' +
             'style="margin: 10px;">\n' +
             '<div class="d-flex w-100 justify-content-between">\n' +
             '<h5 class="mb-1">' + places.place_name + '</h5>\n' +
@@ -214,7 +213,7 @@ function removeMarker2() {
     clickMarker = [];
 }
 
-// 검색결과 목록 하단에 페이지번호를 표시는 함수입니다
+// 검색결과 목록 하단에 페이지번호를 표시하는 함수입니다
 function displayPagination(pagination) {
     let paginationEl = document.getElementById('pagination'),
         fragment = document.createDocumentFragment(),
@@ -249,4 +248,3 @@ function removeAllChildNods(el) {
         el.removeChild(el.lastChild);
     }
 }
-

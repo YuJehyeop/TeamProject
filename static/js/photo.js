@@ -4,8 +4,8 @@ $(document).ready(function () {
     click_map();
     get_photos();
     $("#file").on("change", handleImgsFilesSelect);
+    $("#photo-file-input").on("change", handleImgsFilesSelect2);
 })
-
 
 // 지도 우클릭 이벤트
 function click_map() {
@@ -78,9 +78,6 @@ function handleImgsFilesSelect(e){
             let html = "<a href=\"javascript:void(0);\" onclick=\"deleteImageAction("+index+")\" id=\"img_id_"+index+"\"><span class=\"image-card\"><img src=\""+e.target.result + "\" data-file='"+f.name+"' class='sleProductFile' title='Click to remove'></span>";
             $(".images").append(html);
             index++;
-
-            // let img_html = "<span class=\"image-card\"><img src=\""+e.target.result + "\"/></span>";
-            // $(".images").append(img_html);
         }
         reader.readAsDataURL(f);
     })
@@ -109,7 +106,6 @@ function uploadphoto() {
 
     // LatLngMarkers.push(lat,lng);
     make_latlng_Marker(lat, lng)
-    console.log("업로드-LatLngMarkers="+LatLngMarkers.x)
 
     $.ajax({
         type: "POST",
