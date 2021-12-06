@@ -2,20 +2,18 @@
 let sel_files2 = [];
 
 function clickPlaceMarker(_title, _address, _lat, _lng) {
-    console.log("클릭마커 동작")
     $.ajax({
         type: "GET",
         url: `/api/place?title=${_title}`,
         data: {},
         success: function (response) {
             let place_info = response['place-info']
-            console.dir(place_info)
 
             $('#info-place-name').text(_title)
             $('#info-place-address').text(_address)
             $('#info-place-rating').text(`${place_info['rating']} 점 / 5.0 점`)
             $('#info-place-review-count').text(`리뷰 ${place_info['review_count']}건`)
-            $('#info-place-enter-amount').text(`리뷰어 ${place_info['enter_amount']}%가 이 가게에 출입함`)
+            $('#info-place-enter-amount').text(`리뷰어 ${place_info['percent']}%가 이 가게에 출입함`)
 
 
             $('#info-place-lat').val(_lat)
@@ -23,18 +21,17 @@ function clickPlaceMarker(_title, _address, _lat, _lng) {
 
             $('#place-info').show()
             $('#place-list').hide()
-
-            showReview()
+            console.log("클릭마커 동작")
+            showReview(_title, _address, 1)
             loadReview(_title, _address, 1)
-            loadPhoto(_title, _address)
-
+            // loadPhoto_my(_title, _address)
+            loadPhoto_all(_title, _address)
         }
     })
-
 }
 
 function loadReview(_title, _address, _currentPage) {
-    user_id = "manijang3"
+    let user_id = "manijang3"
     $.ajax({
         type: "GET",
         url: `/api/review/pagination?title=${_title}&address=${_address}&page=${_currentPage}&user_id=${user_id}`,
@@ -67,10 +64,6 @@ function loadReview(_title, _address, _currentPage) {
                 $('#review-list').append(temp_html)
             }
 
-
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
             // 한 화면에 보여줄 페이지 수
             const pageBlock = 3;
             // 한 페이지에 보여줄 리뷰 수
@@ -93,7 +86,6 @@ function loadReview(_title, _address, _currentPage) {
 
                 if (startPage > pageBlock) {
                     $('#review-pagination-ul').append(`<li class="page-item"><a class="page-link" style="cursor:pointer; color: #5cb85c; font-weight: normal;" onclick="loadReview('${_title}', '${_address}', '${startPage - pageBlock}')">Previous</a></li>`)
-                    // <a href="list.jsp?pageNum=<%=startPage - 10%>">[이전]</a>
                 }
 
                 for (let i = startPage; i <= endPage; i++) {
@@ -105,7 +97,6 @@ function loadReview(_title, _address, _currentPage) {
                 }
 
                 if (endPage < pageTotCount) { // 현재 블록의 마지막 페이지보다 페이지 전체 블록수가 클경우 다음 링크 생성
-                    // <a href="list.jsp?pageNum=<%=startPage + 10 %>">[다음]</a>
                     $('#review-pagination-ul').append(`<li class="page-item"><a class="page-link" style="cursor:pointer; color: #5cb85c; font-weight: normal;" onclick="loadReview('${_title}', '${_address}', '${startPage + pageBlock}')">Next</a></li>`)
                 }
             }
@@ -113,24 +104,30 @@ function loadReview(_title, _address, _currentPage) {
     })
 }
 
-function loadPhoto(title, address){
-    console.log("사진 업로드 동작")
+function changeModelPhoto(filename) {
+    $("#modal-photo-img").attr("src",filename)
+}
+
+// 내 사진만 보기 동작
+
+function loadPhoto_my(title, address) {
+    console.log("my업로드 동작")
+    let user_id = "manijang3"
     $.ajax({
         type: "GET",
-        url: `/fileUpload/photo?title=${title}&address=${address}`,
+        url: `/api/place/photo/my?title=${title}&address=${address}&user_id=${user_id}`,
         data: {},
         success: function (response) {
-            console.log("사진 가져오기 동작1")
             $('#post_photo2').empty()
-            let photo = response['latlng_photos2']
-            for (let i=0; i < photo.length; i++) {
-                console.log("사진 가져오기 동작2")
+            let photo = response['my_photos']
+            for (let i = 0; i < photo.length; i++) {
                 let filename = photo[i]['filenames']
                 let temp_html = `<div class="col-md-4">
                                         <div class="thumbnail">
-                                            <a href="">
-                                                <img src="../static/load_img/${filename}" alt="Lights" style="width:100%">
+                                            <a data-toggle="modal" data-target="#exampleModalLong" onclick="changeModelPhoto('../static/load_img/${filename}')">
+                                                <img src="../static/load_img/${filename}" alt="Lights" style="max-height: 80px;">
                                             </a>
+                                            <div class="delete-box"><a>삭제</a></div>
                                         </div>
                                     </div>`
                 $('#post_photo2').append(temp_html)
@@ -139,11 +136,38 @@ function loadPhoto(title, address){
     });
 }
 
+// 모든 사진 보기 동작 (Default)
+function loadPhoto_all(title, address) {
+    console.log("all업로드 동작")
+    $.ajax({
+        type: "GET",
+        url: `/api/place/photo/all?title=${title}&address=${address}`,
+        data: {},
+        success: function (response) {
+            $('#post_photo2').empty()
+            let photo = response['all_photos']
+            for (let i = 0; i < photo.length; i++) {
+                let filename = photo[i]['filenames']
+                let temp_html = `<div class="col-md-4">
+                                        <div class="thumbnail">
+                                            <a data-toggle="modal" data-target="#exampleModalLong" onclick="changeModelPhoto('../static/load_img/${filename}')">
+                                                <img src="../static/load_img/${filename}" alt="Lights" style="max-height: 80px;">
+                                            </a>
+                                            <div class="delete-box"><a>삭제</a></div>
+                                        </div>
+                                    </div>`
+                $('#post_photo2').append(temp_html)
+            }
+        }
+    })
+}
 
 
-function showReview() {
+function showReview(_title, _address, _page) {
     $('#place-review-info').show();
     $('#place-photo-info').hide();
+
+    loadReview(_title, _address, 1)
 }
 
 function showPhoto() {
@@ -152,12 +176,18 @@ function showPhoto() {
 }
 
 function registerReview() {
+    $.ajax({
+        type: 'GET',
+        url: `/api/reviews/save`,
+        data: {},
+        success: function (response) {
+
+    let _user_id =  (response["id_receive"])
     let _enter_with_check = $('#enter-with-check').is(':checked')
     let _rating = $("#review-rating-radio option:selected").val()
     let _review_content = $('#review-content').val()
     let _lat = $('#info-place-lat').val();
     let _lng = $('#info-place-lng').val();
-    let _user_id = 'manijang2'
     let _title = $('#info-place-name').text()
     let _address = $('#info-place-address').text()
 
@@ -177,6 +207,11 @@ function registerReview() {
         success: function (response) {
             alert(response['msg'])
             window.location.reload() // 새로고침
+
+                    }
+                })
+
+
         }
     })
 }
@@ -224,7 +259,6 @@ function handleImgsFilesSelect2(e){
                 "              <button class=\"delete-box\" onclick=\"deleteImageAction2("+index+")\"><a>삭제</a></button>\n" +
                 "          </div>\n" +
                 "       </div>"
-            // let html = "<a href=\"javascript:void(0);\" onclick=\"deleteImageAction2("+index+")\" id=\"img2_id_"+index+"\"><span class=\"image-card\"><img src=\""+e.target.result + "\" data-file='"+f.name+"' class='sleProductFile' title='Click to remove'></span>";
             $(".row2").append(html);
             index++;
         }
@@ -239,36 +273,7 @@ function deleteImageAction2(index){
     $(img2_id).remove();
 }
 
-// 수정전
-// function aa() {
-//     alert('123')
-//     let formData = new FormData($('#fileForm')[0]);
-//
-//     title = $('#info-place-name').text()
-//     address = $('#info-place-address').text()
-//
-//     formData.append("title", title)
-//     formData.append("address", address)
-//
-//     $.ajax({
-//         type: "POST",
-//         enctype: 'multipart/form-data',
-//         url: `/fileUpload`,
-//         data: formData,
-//         processData: false,
-//         contentType: false,
-//         cache: false,
-//         success: function (result) {
-//             console.dir(result)
-//             alert(result['msg'])
-//         },
-//         error: function (e) {
-//             alert(e)
-//         }
-//     });
-// }
-
-// 수정중
+//이미지 파일 post
 function aa() {
     let formData = new FormData();
     // let formData = new FormData($('#fileForm')[0]);
@@ -298,7 +303,6 @@ function aa() {
         }
     });
 }
-
 
 function search_place() {
     $("#hello").hide() // 추천목록 숨기기

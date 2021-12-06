@@ -1,9 +1,10 @@
 from flask import Flask, render_template, jsonify, request
 from pymongo import MongoClient
-from datetime import datetime
+# from datetime import datetime
 
 import hashlib
 import jwt
+import datetime
 
 app = Flask(__name__)
 
@@ -18,44 +19,54 @@ def main():
     return render_template('index.html')
 
 
-@app.route('/api/recommend', methods=['GET'])
-def show_stars():
-    like_star = list(db.puppy.find({}, {'_id': False}).sort("like", -1))
-    return jsonify({'like': like_star})
+@app.route('/api/login/recommend', methods=['GET'])
+def show_withpuppy():
+    id_receive = getUserLoginId()
+    places = list(db.places.find({}, {'_id': False}).sort("like_count", -1))
+    login_like = list(db.reviews.find({"user_id": id_receive}, {'_id': False}))
+
+    if like_star is None:
+        none_star = "False"
+        return jsonify({'places': places, 'login_like': login_like, "none_star": none_star})
+    return jsonify({'places': places, 'login_like': login_like})
 
 
 @app.route('/api/like_button', methods=['POST'])
 def like_star():
     name_receive = request.form['name_give']
-    target_star = db.puppy.find_one({"title": name_receive})
-    current_like = target_star['like']
-    new_like = current_like + 1
-    db.puppy.update_one({"title": name_receive}, {'$set': {'like': new_like}})
-    return jsonify({'msg': '좋아요 완료!'})
+    target_star = db.places.find_one({"title": name_receive})
+    count_like = target_star['like_count']
+
+    login_star = db.reviews.find_one({"title": name_receive})
+    login_like = login_star['like']
+
+    if login_like == "True":
+        new_like = count_like - 1
+        login_like = "False"
+        db.reviews.update_one({"title": name_receive}, {'$set': {'like': login_like}})
+        db.places.update_one({"title": name_receive}, {'$set': {'like_count': new_like}})
+        return jsonify({'msg': '좋아요 취소 완료!'})
+    else:
+        new_like = count_like + 1
+        login_like = "True"
+        db.reviews.update_one({"title": name_receive}, {'$set': {'like': login_like}})
+        db.places.update_one({"title": name_receive}, {'$set': {'like_count': new_like}})
+        return jsonify({'msg': '좋아요 완료!'})
 
 
-@app.route('/placereview', methods=['POST'])
-def write_review():
-    name_receive = request.form['name_give']
-    review_receive = request.form['review_give']
-    rating_receive = request.form['rating_give']
-    lat_receive = request.form['lat_give']
-    lng_receive = request.form['lng_give']
+@app.route('/api/reviews/like', methods=['GET'])
+def review_star():
+    id_receive = getUserLoginId()
+    title_receive = request.args.get('title_give')
+    reviews_id = list(db.reviews.find({"user_id":id_receive}, {'_id': False}))
+    reviews_title = list(db.reviews.find({"title":title_receive}, {'_id': False}))
+    return jsonify({'reviews_id': reviews_id, "reviews_title" :reviews_title, 'id_receive':id_receive})
 
-    rating_receive = int(rating_receive)
-    lat_receive = float(lat_receive)
-    lng_receive = float(lng_receive)
-
-    doc = {
-        'title': name_receive,
-        'review': review_receive,
-        'like': rating_receive,
-        'x': lat_receive,
-        'y': lng_receive
-    }
-    db.puppy.insert_one(doc)
-    return jsonify({'msg': ' 저장완료! '})
-
+@app.route('/api/reviews/save', methods=['GET'])
+def review_save():
+    id_receive = getUserLoginId()
+    print(id_receive)
+    return jsonify({'id_receive': id_receive})
 
 @app.route('/placereview', methods=['GET'])
 def read_reviews():
@@ -70,22 +81,24 @@ def place_detail_info():
 
     # 장소 정보 가져옴
     place_row = db.places.find_one({'title': title}, {'_id': False})
+    reviews_row = db.reviews.find_one({'title': title}, {'_id': False})
     if place_row is None:
         # 장소 정보가 없다면 아무도 리뷰를 안 쓴 경우임. 응답 데이터를 0으로 세팅
         doc = {
             "title": title,
             "rating": 0,
             "review_count": 0,
-            "enter_amount": 0
+            "percent": 0
         }
     else:
         doc = {
             "title": place_row['title'],
             "rating": place_row['rating'],
             "review_count": place_row['review_count'],
-            "enter_amount": place_row['enter_amount'],
+            "percent": place_row['percent'],
+            "like_count": place_row['like_count']
         }
-    return jsonify({"place-info": doc})
+    return jsonify({"place-info": doc, "reviews": reviews_row})
 
 
 @app.route('/api/review', methods=['POST'])
@@ -109,7 +122,8 @@ def place_review_register():
             "lng": lng,
             "rating": 0,
             "review_count": 0,
-            "enter_amount": 0
+            "like_count": 0,
+            "percent": 0
         }
         db.places.insert_one(place_doc)
 
@@ -118,6 +132,7 @@ def place_review_register():
         "address": address,
         "user_id": user_id,
         "rating": rating,
+        "like": "False",
         "review": review_content,
         "enter_with": enter_with_check
     }
@@ -141,7 +156,7 @@ def place_review_register():
     updated_place_row = db.places.find_one({'title': title, 'address': address}, {'_id': False})
     updated_place_row['rating'] = rating_final
     updated_place_row['review_count'] = review_count
-    updated_place_row['enter_amount'] = enter_with_final
+    updated_place_row['percent'] = enter_with_final
     db.places.update_one({'title': title, 'address': address}, {'$set': updated_place_row})
     return jsonify({'msg': '저장완료'})
 
@@ -151,7 +166,7 @@ def place_review_select():
     title = request.args.get('title')
     address = request.args.get('address')
     # user_id = request.args.get('user_id')
-    user_id = "manijang3"
+    user_id = getUserLoginId()
 
     review_rows = list(db.reviews.find({'title': title, 'address': address}, {'_id': False}))
     myself_review_idx = find(review_rows, 'user_id', user_id)
@@ -189,6 +204,145 @@ def place_review_delete():
     address = request.form['address']
     db.reviews.delete_one({'title': title, 'address': address, 'user_id': user_id})
 
+    return jsonify({'msg': '삭제완료'})
+
+
+# 사진등록 API
+# [장소 검색 이미지] 등록 1
+@app.route('/fileUpload', methods=['POST'])
+def place_photo_upload():
+    title = request.form['title']
+    address = request.form['address']
+    files = request.files.getlist("file_give")
+    user_id = getUserLoginId()
+
+    # 해당 장소에 대한 파일들을 검사
+    placePhoto_row = db.place_photos.find_one({'title': title, 'address': address, 'user_id': user_id}, {'_id': False})
+
+    # 파일이 없을 경우 생성
+    if placePhoto_row is None:
+        for photo in files:
+            today = datetime.datetime.now()
+            mytime = today.strftime('%Y.%m.%d.%H.%M.%S')
+            name = photo.filename
+            save_to = f'static/load_img/{mytime}-{name}'
+            photo.save(save_to)
+
+            doc = {
+                'title': title,
+                'address': address,
+                'user_id': user_id,
+                'filenames': f'{mytime}-{name}'
+            }
+            db.place_photos.insert_one(doc)
+        return jsonify({'msg': '저장 완료!'})
+
+    elif len(list(db.place_photos.find({'address': address, 'title': title, 'user_id': user_id}, {'_id': False}))) < 3:
+        count = 3 - len(list(db.place_photos.find({'address': address, 'title': title, 'user_id': user_id}, {'_id': False})))
+
+        for photo in files[:count]:
+            today = datetime.datetime.now()
+            mytime = today.strftime('%Y.%m.%d.%H.%M.%S')
+            name = photo.filename
+            save_to = f'static/load_img/{mytime}-{name}'
+            photo.save(save_to)
+
+            doc = {
+                'title': title,
+                'address': address,
+                'user_id': user_id,
+                'filenames': f'{mytime}-{name}'
+            }
+            db.place_photos.insert_one(doc)
+        msg = '추가 완료'
+    else:
+        msg = '해당 파일이 3개보다 많습니다'
+    return jsonify({'msg': msg})
+
+
+def find(mylist, key, value):
+    for i, dic in enumerate(mylist):
+        if dic[key] == value:
+            return i
+    return -1
+
+
+# -------------------------------------------
+# 수정: 내 사진만 볼 경우 아이디 값 추가 비교 후 이미지 가져오기
+@app.route('/api/place/photo/my', methods=['GET'])
+def place_photo_my_select():
+    title = request.args.get('title')
+    address = request.args.get('address')
+    user_id = request.args.get('user_id')
+    my_photos = list(db.place_photos.find({'title': title, 'address': address, 'user_id': user_id}, {'_id': False}))
+    return jsonify({'my_photos': my_photos})
+
+
+# 수정: 모든 사진 볼 경우 title,address만 비교 후 이미지 가져오기.
+@app.route('/api/place/photo/all', methods=['GET'])
+def place_photo_all_select():
+    title = request.args.get('title')
+    address = request.args.get('address')
+    all_photos = list(db.place_photos.find({'title': title, 'address': address}, {'_id': False}))
+    return jsonify({'all_photos': all_photos})
+
+
+# -------------------------------------------
+
+# [좌표 클릭 이미지] 등록 1
+@app.route('/api/photo', methods=['POST'])
+def post_photos():
+    lat_receive = request.form['lat_give']
+    lng_receive = request.form['lng_give']
+
+    file = request.files.getlist("file_give")
+
+    for photo in file:
+        today = datetime.datetime.now()
+        mytime = today.strftime('%Y.%m.%d.%H.%M.%S')
+        name = photo.filename
+        save_to = f'static/photos/{mytime}-{name}'
+        photo.save(save_to)
+
+        doc = {
+            'lat': lat_receive,
+            'lng': lng_receive,
+            'file': f'{mytime}-{name}',
+            'time': f'{mytime}'
+        }
+
+        db.photo.insert_one(doc)
+    return jsonify({'msg': '저장 완료!'})
+
+
+# [좌표 클릭 이미지] 좌표 가져오기 1 (마커 뿌려주기용)
+@app.route('/api/photo', methods=['GET'])
+def get_photos():
+    all = list(db.photo.find({}, {'_id': False}))
+    return jsonify({'all_latlng': all})
+
+
+# [좌표 클릭 이미지] 가져오기 2 ( 좌표비교)
+@app.route('/api/photo/latlng', methods=['GET'])
+def get_latlng():
+    lat = request.args.get('lat')
+    lng = request.args.get('lng')
+
+    photos = list(db.photo.find({'lat': lat, 'lng': lng}, {'_id': False}))
+    return jsonify({'latlng_photos': photos})
+
+# 파일 삭제 장소(filenames)
+@app.route('/api/place/photo', methods=['DELETE'])
+def delete_place_photo():
+    filename = request.args.get('filename')
+    db.place_photos.delete_one({'filenames': filename})
+    return jsonify({'msg': '삭제완료'})
+
+# 파일 삭제 좌표(photo)
+@app.route('/api/latlng/photo', methods=['DELETE'])
+def delete_latlng_photo():
+    filename = request.args.get('file')
+    db.photo.delete_one({'file': filename})
     return jsonify({'msg': '삭제완료'})
 
 
@@ -237,135 +391,32 @@ def api_login():
     result = db.accounts.find_one({'id': id_receive, 'pw': pw_hash})
 
     if result is not None:
-
         payload = {
             'id': id_receive,
             'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=600)
         }
         token = jwt.encode(payload, SECRET_KEY, algorithm='HS256').decode('utf-8')
-
         return jsonify({'result': 'success', 'token': token})
-
     else:
         return jsonify({'result': 'fail', 'msg': '아이디/비밀번호가 일치하지 않습니다.'})
+
+@app.route('/api/User', methods=['DELETE'])
+def user_delete():
+    user_id = getUserLoginId()
+    db.accounts.delete_one({'id': user_id})
+    return jsonify({'msg': '삭제 완료!'})
+
+
+def getUserLoginId():
+    token_receive = request.cookies.get('mytoken')
+    payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    return payload['id'];
 
 
 def truncate(num, n):
     integer = int(num * (10 ** n)) / (10 ** n)
     return float(integer)
 
-# 사진등록 API
-
-# [장소 검색 이미지] 등록 1
-@app.route('/fileUpload', methods=['POST'])
-def place_photo_upload():
-    title = request.form['title']
-    address = request.form['address']
-    files = request.files.getlist("file_give")
-    user_id = "manijang2"
-
-    # 해당 장소에 대한 파일들을 검사
-    placePhoto_row = db.place_photos.find_one({'title': title, 'address': address, 'user_id': user_id}, {'_id': False})
-
-    # 파일이 없을 경우 생성
-    if placePhoto_row is None:
-        for photo in files:
-            today = datetime.now()
-            mytime = today.strftime('%Y.%m.%d.%H.%M.%S')
-            name = photo.filename
-            save_to = f'static/load_img/{mytime}-{name}'
-            photo.save(save_to)
-
-            doc = {
-                'title': title,
-                'address': address,
-                'user_id': user_id,
-                'filenames': f'{mytime}-{name}'
-            }
-            db.place_photos.insert_one(doc)
-        return jsonify({'msg': '저장 완료!'})
-
-    elif len(list(db.place_photos.find({'address': address, 'title': title}, {'_id': False}))) < 3:
-        count = 3 - len(list(db.place_photos.find({'address': address, 'title': title}, {'_id': False})))
-
-        for photo in files[:count]:
-            today = datetime.now()
-            mytime = today.strftime('%Y.%m.%d.%H.%M.%S')
-            name = photo.filename
-            save_to = f'static/load_img/{mytime}-{name}'
-            photo.save(save_to)
-
-            doc = {
-                'title': title,
-                'address': address,
-                'user_id': user_id,
-                'filenames': f'{mytime}-{name}'
-            }
-            db.place_photos.insert_one(doc)
-        msg = '추가 완료'
-    else:
-        msg = '해당 파일이 3개보다 많습니다'
-    return jsonify({'msg': msg})
-
-def find(mylist, key, value):
-    for i, dic in enumerate(mylist):
-        if dic[key] == value:
-            return i
-    return -1
-
-# [장소 검색 이미지] 가져오기
-@app.route('/fileUpload/photo', methods=['GET'])
-def get_photo():
-    address = request.args.get('address')
-    title = request.args.get('title')
-
-    photos = list(db.place_photos.find({'address': address, 'title': title}, {'_id': False}))
-    return jsonify({'latlng_photos2': photos})
-
-
-# [좌표 클릭 이미지] 등록 1
-@app.route('/api/photo', methods=['POST'])
-def post_photos():
-    lat_receive = request.form['lat_give']
-    lng_receive = request.form['lng_give']
-
-    file = request.files.getlist("file_give")
-
-    for photo in file:
-        today = datetime.now()
-        mytime = today.strftime('%Y.%m.%d.%H.%M.%S')
-        name = photo.filename
-        save_to = f'static/photos/{mytime}-{name}'
-        photo.save(save_to)
-
-        doc = {
-            'lat': lat_receive,
-            'lng': lng_receive,
-            'file': f'{mytime}-{name}',
-            'time': f'{mytime}'
-        }
-
-        db.photo.insert_one(doc)
-    return jsonify({'msg': '저장 완료!'})
-
-# [좌표 클릭 이미지] 좌표 가져오기 1
-@app.route('/api/photo', methods=['GET'])
-def get_photos():
-    all = list(db.photo.find({}, {'_id': False}))
-    return jsonify({'all_latlng': all})
-
-# [좌표 클릭 이미지] 가져오기 2 ( 좌표비교)
-@app.route('/api/photo/latlng', methods=['GET'])
-def get_latlng():
-    lat = request.args.get('lat')
-    lng = request.args.get('lng')
-
-    photos = list(db.photo.find({'lat': lat, 'lng': lng}, {'_id': False}))
-    return jsonify({'latlng_photos': photos})
-
 
 if __name__ == '__main__':
     app.run('0.0.0.0', port=5000, debug=True)
-
-
-
